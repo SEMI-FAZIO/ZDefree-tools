@@ -1,25 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <RootNamespace>ZDefree.Core</RootNamespace>
-    <AssemblyName>ZDefree.Core</AssemblyName>
+    <RootNamespace>ZDefree.Cli</RootNamespace>
+    <AssemblyName>zdefree</AssemblyName>
     <Version>0.1.0</Version>
-    <Description>ZDefree shared library: strategy models, JSON loader, winws.exe compiler.</Description>
+    <Description>ZDefree command-line tool: compile strategies, convert Flowseal .bat, bootstrap a distribution.</Description>
     <Authors>ZDefree contributors</Authors>
     <Copyright>MIT</Copyright>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <InternalsVisibleTo Include="ZDefree.Core.Tests" />
+    <ProjectReference Include="..\ZDefree.Core\ZDefree.Core.csproj" />
   </ItemGroup>
 
 </Project>
