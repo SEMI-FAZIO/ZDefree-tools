@@ -1,5 +1,6 @@
 # ZDefree.Tools
 
+[![CI](https://github.com/SEMI-FAZIO/ZDefree-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/SEMI-FAZIO/ZDefree-tools/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 .NET 8 tooling that powers the [ZDefree](https://github.com/SEMI-FAZIO/ZDefree)
