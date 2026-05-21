@@ -1,7 +1,9 @@
+using System.Text.Json;
 using ZDefree.Cli;
 using ZDefree.Core.Bootstrap;
 using ZDefree.Core.Compilation;
 using ZDefree.Core.Conversion;
+using ZDefree.Core.Probing;
 using ZDefree.Core.Serialization;
 
 return CliApp.Run(args);
@@ -32,6 +34,9 @@ namespace ZDefree.Cli
                     "bootstrap" => RunBootstrap(rest).GetAwaiter().GetResult(),
                     "index"     => RunIndex(rest),
                     "lists"     => RunLists(rest).GetAwaiter().GetResult(),
+                    "probe"     => RunProbe(rest).GetAwaiter().GetResult(),
+                    "isp"       => RunIsp(rest).GetAwaiter().GetResult(),
+                    "pick"      => RunPick(rest).GetAwaiter().GetResult(),
                     "version"   => RunVersion(),
                     "help" or "--help" or "-h" or "/?" => RunHelp(rest),
                     _ => UnknownCommand(command),
@@ -74,16 +79,38 @@ namespace ZDefree.Cli
                 return 1;
             }
 
-            var opt = new CompileOptions
-            {
-                GameTcpPorts = ReadOption(args, "--game-tcp"),
-                GameUdpPorts = ReadOption(args, "--game-udp"),
-                BinDir       = ReadOption(args, "--bin-dir") ?? "bin/",
-                ListsDir     = ReadOption(args, "--lists-dir") ?? "lists/",
-            };
+            string target = (ReadOption(args, "--target") ?? "winws").ToLowerInvariant();
+            var strategy  = StrategyLoader.LoadFromFile(strategyPath);
 
-            var strategy = StrategyLoader.LoadFromFile(strategyPath);
-            string cli = new WinwsCompiler(opt).Compile(strategy);
+            string cli;
+            switch (target)
+            {
+                case "winws":
+                    cli = new WinwsCompiler(new CompileOptions
+                    {
+                        GameTcpPorts = ReadOption(args, "--game-tcp"),
+                        GameUdpPorts = ReadOption(args, "--game-udp"),
+                        BinDir       = ReadOption(args, "--bin-dir") ?? "bin/",
+                        ListsDir     = ReadOption(args, "--lists-dir") ?? "lists/",
+                    }).Compile(strategy);
+                    break;
+
+                case "nfqws":
+                    cli = new NfqwsCompiler(new NfqwsCompileOptions
+                    {
+                        GameTcpPorts = ReadOption(args, "--game-tcp"),
+                        GameUdpPorts = ReadOption(args, "--game-udp"),
+                        BinDir       = ReadOption(args, "--bin-dir") ?? "bin/",
+                        ListsDir     = ReadOption(args, "--lists-dir") ?? "lists/",
+                        QueueNum     = int.TryParse(ReadOption(args, "--qnum"), out var q) ? q : 200,
+                    }).Compile(strategy);
+                    break;
+
+                default:
+                    Console.Error.WriteLine($"Error: unknown --target '{target}'. Use 'winws' or 'nfqws'.");
+                    return 2;
+            }
+
             Console.WriteLine(cli);
             return 0;
         }
@@ -185,6 +212,139 @@ namespace ZDefree.Cli
             Console.Error.WriteLine();
             Console.WriteLine(Messages.BootstrapDone(result.InstalledFiles.Count));
             return 0;
+        }
+
+        private static async Task<int> RunPick(List<string> args)
+        {
+            string strategiesDir = ReadOption(args, "--strategies-dir") ?? "strategies";
+            string ispMode       = ReadOption(args, "--isp") ?? "none";
+            bool dryRun          = args.Contains("--dry-run") || !args.Contains("--live");
+            bool json            = args.Contains("--json");
+
+            if (!Directory.Exists(strategiesDir))
+            {
+                Console.Error.WriteLine(Messages.ErrFileNotFound(strategiesDir));
+                return 1;
+            }
+
+            using var ispDet = new IspDetector();
+            var picker = new StrategyPicker(ispDet);
+            var result = await picker.RunAsync(new PickerOptions
+            {
+                StrategiesDir = strategiesDir,
+                IspMode       = ispMode,
+                DryRun        = dryRun,
+            });
+
+            if (json)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            else
+            {
+                if (result.DetectedIsp is { } isp)
+                {
+                    Console.WriteLine($"Detected ISP: {isp.CompatTag ?? isp.Asn ?? "-"} ({isp.OrgName ?? "-"})");
+                }
+                else if (ispMode != "none")
+                {
+                    Console.WriteLine($"ISP filter: {ispMode}");
+                }
+                Console.WriteLine();
+                Console.WriteLine($"{"RANK",-5} {"ID",-32} {"CATEGORY",-12} ISP-MATCH");
+                int rank = 1;
+                foreach (var c in result.Candidates)
+                {
+                    string mark = c.IspMatched ? $"yes ({c.MatchedIspTag})" : "-";
+                    Console.WriteLine($"{rank,-5} {c.Id,-32} {c.Category ?? "-",-12} {mark}");
+                    rank++;
+                }
+                if (!dryRun)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Note: live mode (winws orchestration) not yet implemented — showing ranking only.");
+                }
+            }
+
+            return 0;
+        }
+
+        private static async Task<int> RunIsp(List<string> args)
+        {
+            bool json = args.Contains("--json");
+            string? endpoint = ReadOption(args, "--endpoint");
+
+            using var det = new IspDetector(endpoint: endpoint);
+            try
+            {
+                var info = await det.DetectAsync();
+                if (json)
+                {
+                    Console.WriteLine(JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                else
+                {
+                    Console.WriteLine($"IP        : {info.Ip}");
+                    Console.WriteLine($"Country   : {info.Country ?? "-"}");
+                    Console.WriteLine($"ASN       : {info.Asn ?? "-"}");
+                    Console.WriteLine($"Org       : {info.OrgName ?? "-"}");
+                    Console.WriteLine($"Compat tag: {info.CompatTag ?? "-"}");
+                }
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ISP detection failed: {ex.GetType().Name}: {ex.Message}");
+                return 1;
+            }
+        }
+
+        private static async Task<int> RunProbe(List<string> args)
+        {
+            // Collect repeated --target values.
+            var targetSpecs = new List<string>();
+            for (int i = 0; i < args.Count - 1; i++)
+            {
+                if (args[i] == "--target")
+                {
+                    targetSpecs.Add(args[i + 1]);
+                }
+            }
+
+            IReadOnlyList<ProbeTarget> targets = targetSpecs.Count > 0
+                ? targetSpecs.Select(ProbeTarget.Parse).ToList()
+                : ConnectionProbe.DefaultTargets;
+
+            int timeoutMs = int.TryParse(ReadOption(args, "--timeout-ms"), out var t) ? t : 3000;
+            bool skipPing = args.Contains("--no-ping") || args.Contains("--skip-ping");
+            bool json     = args.Contains("--json");
+
+            var options = new ProbeOptions
+            {
+                Targets   = targets,
+                TimeoutMs = timeoutMs,
+                SkipPing  = skipPing,
+            };
+
+            using var probe = new ConnectionProbe();
+            var results = await probe.RunAsync(options);
+
+            if (json)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(results, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            else
+            {
+                Console.WriteLine($"{"TARGET",-30} {"HTTPS",-12} {"PING",-12} SCORE  NOTE");
+                foreach (var r in results)
+                {
+                    string https = r.HttpsOk ? $"{r.HttpsMs:F0} ms"      : "FAIL";
+                    string ping  = r.PingOk  ? $"{r.PingMs:F0} ms"       : (skipPing ? "-" : "FAIL");
+                    Console.WriteLine($"{r.Target,-30} {https,-12} {ping,-12} {r.Score,5:F1}  {r.Error ?? ""}");
+                }
+            }
+
+            return results.All(r => !r.HttpsOk) ? 1 : 0;
         }
 
         private static async Task<int> RunLists(List<string> args)

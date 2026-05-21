@@ -1,0 +1,26 @@
+{
+  "$schema": "INDEX.schema.json",
+  "schema_version": 1,
+  "generated_at": "2026-05-21T16:15:23.101283+00:00",
+  "generator": "zdefree index v0.1.0",
+  "strategies": [
+    {
+      "id": "unrelated-isp",
+      "name": "Unrelated ISP",
+      "category": "alt",
+      "file": "common/unrelated-isp.json"
+    },
+    {
+      "id": "with-isp-match",
+      "name": "Has tested ISP",
+      "category": "alt",
+      "file": "common/with-isp-match.json"
+    },
+    {
+      "id": "no-compat",
+      "name": "No compat",
+      "category": "general",
+      "file": "common/no-compat.json"
+    }
+  ]
+}

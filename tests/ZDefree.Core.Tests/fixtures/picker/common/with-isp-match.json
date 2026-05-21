@@ -1,0 +1,12 @@
+{
+  "id": "with-isp-match",
+  "name": "Has tested ISP",
+  "category": "alt",
+  "version": 1,
+  "compat": { "tested_isps": ["AS8402-Vimpelcom", "AS12389-Rostelecom"] },
+  "filters": [
+    { "name": "main", "wf": { "tcp": "443" },
+      "rules": [{ "match": { "tcp": "443" }, "desync": { "mode": "fake" } }]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "no-compat",
+  "name": "No compat",
+  "category": "general",
+  "version": 1,
+  "filters": [
+    { "name": "main", "wf": { "tcp": "443" },
+      "rules": [{ "match": { "tcp": "443" }, "desync": { "mode": "split2" } }]
+    }
+  ]
+}

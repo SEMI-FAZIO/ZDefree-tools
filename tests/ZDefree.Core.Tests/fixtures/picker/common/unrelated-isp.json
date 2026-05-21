@@ -1,0 +1,12 @@
+{
+  "id": "unrelated-isp",
+  "name": "Unrelated ISP",
+  "category": "alt",
+  "version": 1,
+  "compat": { "tested_isps": ["AS999999-Nobody"] },
+  "filters": [
+    { "name": "main", "wf": { "tcp": "443" },
+      "rules": [{ "match": { "tcp": "443" }, "desync": { "mode": "fake" } }]
+    }
+  ]
+}

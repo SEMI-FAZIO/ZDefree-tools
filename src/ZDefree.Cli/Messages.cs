@@ -30,6 +30,9 @@ Commands:
   bootstrap [--out <dir>]            Download winws.exe + WinDivert + lists into a ZDefree folder
   lists [--out <dir>]                Download domain/IP lists from 1andrevich/Re-filter-lists
   index [--strategies-dir <dir>]     (Re)generate strategies/INDEX.json catalog
+  probe [--target <host>]...         Measure HTTPS+ping latency to target hosts
+  isp [--json]                       Detect external IP + ASN/ISP via ipinfo.io
+  pick [--isp auto|<tag>] [--dry-run] Rank strategies (ISP-matched first)
   version                            Print version
   help [command]                     Show help
 
@@ -48,6 +51,9 @@ Examples:
   bootstrap [--out <каталог>]        Скачать winws.exe + WinDivert + списки в папку ZDefree
   lists [--out <каталог>]            Скачать списки доменов/IP из 1andrevich/Re-filter-lists
   index [--strategies-dir <каталог>] (Пере)генерировать каталог strategies/INDEX.json
+  probe [--target <хост>]...         Измерить HTTPS+ping латентность до хостов
+  isp [--json]                       Определить внешний IP + ASN/ISP через ipinfo.io
+  pick [--isp auto|<тег>] [--dry-run] Ранжировать стратегии (ISP-совпадения сверху)
   version                            Показать версию
   help [команда]                     Показать справку
 
@@ -60,8 +66,8 @@ Examples:
 """);
 
     public static string CompileUsage => Get(
-        "Usage: zdefree compile <strategy.json> [--game-tcp <ports>] [--game-udp <ports>] [--bin-dir <path>] [--lists-dir <path>]",
-        "Использование: zdefree compile <strategy.json> [--game-tcp <порты>] [--game-udp <порты>] [--bin-dir <путь>] [--lists-dir <путь>]");
+        "Usage: zdefree compile <strategy.json> [--target winws|nfqws] [--game-tcp <ports>] [--game-udp <ports>] [--bin-dir <path>] [--lists-dir <path>] [--qnum N]",
+        "Использование: zdefree compile <strategy.json> [--target winws|nfqws] [--game-tcp <порты>] [--game-udp <порты>] [--bin-dir <путь>] [--lists-dir <путь>] [--qnum N]");
 
     public static string Bat2JsonUsage => Get(
         "Usage: zdefree bat2json <input.bat> [output.json] [--id <id>] [--name <name>]",
@@ -122,4 +128,8 @@ Examples:
     public static string ListsDone(int packCount) => Get(
         $"Done. Installed {packCount} list pack(s).",
         $"Готово. Установлено пакетов списков: {packCount}.");
+
+    public static string ProbeUsage => Get(
+        "Usage: zdefree probe [--target <host[:port]>]... [--timeout-ms N] [--no-ping] [--json]",
+        "Использование: zdefree probe [--target <хост[:порт]>]... [--timeout-ms N] [--no-ping] [--json]");
 }
