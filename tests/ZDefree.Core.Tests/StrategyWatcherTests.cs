@@ -146,10 +146,12 @@ public class StrategyWatcherTests
             watcher.Changed += (_, e) => events.Add(e);
             watcher.Start();
 
-            await Task.Delay(100); // let watcher settle
+            // Longer settle on Linux/inotify — the watch handle is set up
+            // asynchronously and 100ms isn't always enough on CI runners.
+            await Task.Delay(500);
             File.Delete(path);
 
-            await WaitForAtLeast(events, count: 1, timeoutMs: 2000);
+            await WaitForAtLeast(events, count: 1, timeoutMs: 5000);
             Assert.Contains(events, e => e.Kind == StrategyChangeKind.Removed && Path.GetFileName(e.FilePath) == "doomed.json");
         }
     }
@@ -183,11 +185,12 @@ public class StrategyWatcherTests
             var events = new ConcurrentBag<StrategyChangeEvent>();
             watcher.Changed += (_, e) => events.Add(e);
             watcher.Start();
+            await Task.Delay(500); // let inotify/RDCW attach
 
             string path = Path.Combine(root, "advanced", "experimental.json");
             await File.WriteAllTextAsync(path, "{}");
 
-            await WaitForAtLeast(events, count: 1, timeoutMs: 2000);
+            await WaitForAtLeast(events, count: 1, timeoutMs: 5000);
             Assert.Contains(events, e => e.FilePath.Contains("advanced", StringComparison.OrdinalIgnoreCase));
         }
     }
