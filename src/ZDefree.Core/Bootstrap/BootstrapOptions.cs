@@ -17,6 +17,14 @@ public sealed class BootstrapOptions
     public bool DownloadPatterns { get; init; } = true;
     public bool DownloadLists { get; init; } = true;
 
+    /// <summary>
+    /// Opt-in: also download bol-van/zapret's nfqws Linux binary into bin/nfqws.
+    /// Default false (independent of host OS — explicit opt-in keeps Windows
+    /// bootstraps small).
+    /// </summary>
+    public bool DownloadNfqws { get; init; } = false;
+    public NfqwsArch NfqwsArchOverride { get; init; } = NfqwsArch.Auto;
+
     public WinwsArch Arch { get; init; } = WinwsArch.Auto;
 
     public IProgress<BootstrapProgress>? Progress { get; init; }

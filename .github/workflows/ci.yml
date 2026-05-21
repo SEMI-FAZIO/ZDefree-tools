@@ -36,3 +36,34 @@ jobs:
           name: test-results
           path: '**/test-results.trx'
           retention-days: 14
+
+  nfqws-bootstrap:
+    name: Smoke nfqws bootstrap (Linux x86_64)
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Bootstrap nfqws only
+        run: |
+          dotnet run --project src/ZDefree.Cli -c Release -- \
+            bootstrap --out ./smoke \
+            --skip-winws --skip-windivert --skip-patterns --skip-lists \
+            --include-nfqws
+
+      - name: Verify nfqws is a Linux x86_64 ELF and executable
+        run: |
+          test -f ./smoke/bin/nfqws
+          file ./smoke/bin/nfqws | tee /tmp/nfqws-file.txt
+          grep -q "ELF 64-bit"      /tmp/nfqws-file.txt
+          grep -q "x86-64"          /tmp/nfqws-file.txt
+          test -x ./smoke/bin/nfqws
+
+      - name: Sanity-run nfqws --help (should not crash)
+        run: ./smoke/bin/nfqws --help || test $? -eq 1   # nfqws --help may exit 1, that's fine

@@ -58,6 +58,11 @@ public sealed class BootstrapRunner : IDisposable
             await InstallListsAsync(options, result, ct);
         }
 
+        if (options.DownloadNfqws)
+        {
+            await InstallNfqwsAsync(options, result, ct);
+        }
+
         await WriteVersionFileAsync(options, result, ct);
 
         return result;
@@ -242,6 +247,27 @@ public sealed class BootstrapRunner : IDisposable
             await _gh.DownloadToFileAsync(f.DownloadUrl, dest, expectedSha256: null, progress: null, ct);
             result.InstalledFiles.Add(Path.GetRelativePath(opt.TargetDir, dest));
             result.PatternsInstalled++;
+        }
+    }
+
+    private async Task InstallNfqwsAsync(BootstrapOptions opt, BootstrapResult result, CancellationToken ct)
+    {
+        var installer = new NfqwsInstaller(_gh);
+        try
+        {
+            var nfq = await installer.InstallAsync(new NfqwsOptions
+            {
+                TargetDir = opt.TargetDir,
+                Arch      = opt.NfqwsArchOverride,
+                Progress  = opt.Progress,
+            }, ct);
+
+            result.InstalledFiles.Add(Path.GetRelativePath(opt.TargetDir, nfq.TargetPath));
+            foreach (var w in nfq.Warnings) result.Warnings.Add($"nfqws: {w}");
+        }
+        catch (Exception ex)
+        {
+            result.Warnings.Add($"nfqws install failed: {ex.Message}");
         }
     }
 

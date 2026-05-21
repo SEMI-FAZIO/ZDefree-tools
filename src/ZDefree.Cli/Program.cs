@@ -5,6 +5,7 @@ using ZDefree.Core.Compilation;
 using ZDefree.Core.Conversion;
 using ZDefree.Core.Probing;
 using ZDefree.Core.Serialization;
+using ZDefree.Core.Watching;
 
 return CliApp.Run(args);
 
@@ -37,6 +38,7 @@ namespace ZDefree.Cli
                     "probe"     => RunProbe(rest).GetAwaiter().GetResult(),
                     "isp"       => RunIsp(rest).GetAwaiter().GetResult(),
                     "pick"      => RunPick(rest).GetAwaiter().GetResult(),
+                    "watch"     => RunWatch(rest).GetAwaiter().GetResult(),
                     "version"   => RunVersion(),
                     "help" or "--help" or "-h" or "/?" => RunHelp(rest),
                     _ => UnknownCommand(command),
@@ -167,7 +169,9 @@ namespace ZDefree.Cli
             bool skipWinDivert = args.Contains("--skip-windivert");
             bool skipPatterns = args.Contains("--skip-patterns");
             bool skipLists = args.Contains("--skip-lists");
+            bool includeNfqws = args.Contains("--include-nfqws");
             string? archStr = ReadOption(args, "--arch");
+            string? nfqwsArchStr = ReadOption(args, "--nfqws-arch");
 
             var arch = archStr?.ToLowerInvariant() switch
             {
@@ -178,6 +182,16 @@ namespace ZDefree.Cli
                 _       => throw new ArgumentException($"Unknown --arch value: {archStr}. Use x64, x86, or arm64."),
             };
 
+            var nfqwsArch = nfqwsArchStr?.ToLowerInvariant() switch
+            {
+                "x86_64" or "x64" => NfqwsArch.LinuxX64,
+                "x86"             => NfqwsArch.LinuxX86,
+                "arm"             => NfqwsArch.LinuxArm,
+                "arm64"           => NfqwsArch.LinuxArm64,
+                null              => NfqwsArch.Auto,
+                _                 => throw new ArgumentException($"Unknown --nfqws-arch value: {nfqwsArchStr}. Use x86_64, x86, arm, or arm64."),
+            };
+
             var options = new BootstrapOptions
             {
                 TargetDir = outDir,
@@ -185,6 +199,8 @@ namespace ZDefree.Cli
                 DownloadWinDivert = !skipWinDivert,
                 DownloadPatterns = !skipPatterns,
                 DownloadLists = !skipLists,
+                DownloadNfqws = includeNfqws,
+                NfqwsArchOverride = nfqwsArch,
                 Arch = arch,
                 Progress = new Progress<BootstrapProgress>(p =>
                 {
@@ -214,11 +230,60 @@ namespace ZDefree.Cli
             return 0;
         }
 
+        private static async Task<int> RunWatch(List<string> args)
+        {
+            string strategiesDir = ReadOption(args, "--strategies-dir") ?? "strategies";
+            int debounceMs = int.TryParse(ReadOption(args, "--debounce-ms"), out var d) ? d : 250;
+            bool json = args.Contains("--json");
+
+            if (!Directory.Exists(strategiesDir))
+            {
+                Console.Error.WriteLine(Messages.ErrFileNotFound(strategiesDir));
+                return 1;
+            }
+
+            using var cts = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, ev) =>
+            {
+                ev.Cancel = true;
+                cts.Cancel();
+            };
+
+            using var watcher = new StrategyWatcher(strategiesDir, TimeSpan.FromMilliseconds(debounceMs));
+            watcher.Changed += (_, e) =>
+            {
+                if (json)
+                {
+                    Console.WriteLine(JsonSerializer.Serialize(e));
+                    Console.Out.Flush();
+                }
+                else
+                {
+                    string ts = e.At.ToLocalTime().ToString("HH:mm:ss.fff");
+                    string from = e.OldPath is null ? "" : $" (from {Path.GetFileName(e.OldPath)})";
+                    Console.WriteLine($"[{ts}] {e.Kind,-8} {Path.GetFileName(e.FilePath)}{from}");
+                }
+            };
+
+            watcher.Start();
+            Console.Error.WriteLine($"Watching {Path.GetFullPath(strategiesDir)} (debounce={debounceMs}ms). Ctrl-C to stop.");
+
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cts.Token);
+            }
+            catch (TaskCanceledException) { }
+
+            Console.Error.WriteLine("Stopped.");
+            return 0;
+        }
+
         private static async Task<int> RunPick(List<string> args)
         {
             string strategiesDir = ReadOption(args, "--strategies-dir") ?? "strategies";
             string ispMode       = ReadOption(args, "--isp") ?? "none";
-            bool dryRun          = args.Contains("--dry-run") || !args.Contains("--live");
+            bool live            = args.Contains("--live");
+            bool dryRun          = args.Contains("--dry-run") || !live;
             bool json            = args.Contains("--json");
 
             if (!Directory.Exists(strategiesDir))
@@ -229,12 +294,19 @@ namespace ZDefree.Cli
 
             using var ispDet = new IspDetector();
             var picker = new StrategyPicker(ispDet);
-            var result = await picker.RunAsync(new PickerOptions
+            var pickOpts = new PickerOptions
             {
                 StrategiesDir = strategiesDir,
                 IspMode       = ispMode,
                 DryRun        = dryRun,
-            });
+            };
+
+            if (live)
+            {
+                return await RunPickLive(picker, pickOpts, args, json);
+            }
+
+            var result = await picker.RunAsync(pickOpts);
 
             if (json)
             {
@@ -259,10 +331,69 @@ namespace ZDefree.Cli
                     Console.WriteLine($"{rank,-5} {c.Id,-32} {c.Category ?? "-",-12} {mark}");
                     rank++;
                 }
-                if (!dryRun)
+            }
+
+            return 0;
+        }
+
+        private static async Task<int> RunPickLive(StrategyPicker picker, PickerOptions pickOpts, List<string> args, bool json)
+        {
+            string? winwsPath = ReadOption(args, "--winws-path");
+            string  binDir    = ReadOption(args, "--bin-dir")   ?? "bin/";
+            string  listsDir  = ReadOption(args, "--lists-dir") ?? "lists/";
+            string? gameTcp   = ReadOption(args, "--game-tcp");
+            string? gameUdp   = ReadOption(args, "--game-udp");
+
+            int stabilizationMs = int.TryParse(ReadOption(args, "--stabilization-ms"), out var sm) ? sm : 2000;
+            int perStrategyMs   = int.TryParse(ReadOption(args, "--per-strategy-timeout-ms"), out var pm) ? pm : 15000;
+
+            // Default winws path: <bin-dir>/winws.exe.
+            winwsPath ??= Path.Combine(binDir, "winws.exe");
+
+            if (!File.Exists(winwsPath))
+            {
+                Console.Error.WriteLine($"winws.exe not found at: {winwsPath}");
+                Console.Error.WriteLine("Live mode requires a bootstrapped distribution. Run `zdefree bootstrap --out <dir>` first,");
+                Console.Error.WriteLine("or pass --winws-path explicitly.");
+                return 1;
+            }
+
+            var live = new LivePickerSettings
+            {
+                WinwsExePath        = winwsPath,
+                BinDir              = binDir,
+                ListsDir            = listsDir,
+                GameTcpPorts        = gameTcp,
+                GameUdpPorts        = gameUdp,
+                StabilizationWait   = TimeSpan.FromMilliseconds(stabilizationMs),
+                PerStrategyTimeout  = TimeSpan.FromMilliseconds(perStrategyMs),
+            };
+
+            using var probe = new ConnectionProbe();
+            var result = await picker.RunLiveAsync(
+                pickOpts,
+                probe,
+                () => new WinwsProcess(),
+                live);
+
+            if (json)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            else
+            {
+                if (result.DetectedIsp is { } isp)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine("Note: live mode (winws orchestration) not yet implemented — showing ranking only.");
+                    Console.WriteLine($"Detected ISP: {isp.CompatTag ?? isp.Asn ?? "-"} ({isp.OrgName ?? "-"})");
+                }
+                Console.WriteLine();
+                Console.WriteLine($"{"RANK",-5} {"ID",-32} {"SCORE",-7} ERROR");
+                int rank = 1;
+                foreach (var c in result.Ranked)
+                {
+                    string err = c.Error ?? "";
+                    Console.WriteLine($"{rank,-5} {c.Base.Id,-32} {c.Score,7:F1} {err}");
+                    rank++;
                 }
             }
 

@@ -1,3 +1,4 @@
+using ZDefree.Core.Compilation;
 using ZDefree.Core.Models;
 using ZDefree.Core.Serialization;
 
@@ -27,11 +28,41 @@ public sealed record PickerOptions
 
     /// <summary>
     /// Dry-run only ranks candidates without running probe/winws.
-    /// Live mode is currently informational; full orchestration is deferred
-    /// to a future sprint that ships winws process management.
     /// </summary>
     public bool DryRun { get; init; } = true;
 }
+
+/// <summary>
+/// Configuration for <see cref="StrategyPicker.RunLiveAsync"/>. Required
+/// because live mode needs paths to the winws.exe binary, lists, and bin
+/// dir to compile per-strategy command lines.
+/// </summary>
+public sealed record LivePickerSettings
+{
+    public required string WinwsExePath { get; init; }
+    public required string BinDir       { get; init; }
+    public required string ListsDir     { get; init; }
+
+    public IReadOnlyList<ProbeTarget>? Targets { get; init; }
+    public TimeSpan StabilizationWait { get; init; } = TimeSpan.FromSeconds(2);
+    public TimeSpan PerStrategyTimeout { get; init; } = TimeSpan.FromSeconds(15);
+    public string? GameTcpPorts { get; init; }
+    public string? GameUdpPorts { get; init; }
+}
+
+/// <summary>
+/// One row of <see cref="LivePickerResult"/>. Score is the mean of probe scores
+/// (0 if the process failed to start or all probes failed).
+/// </summary>
+public sealed record LiveCandidate(
+    PickerCandidate Base,
+    double Score,
+    IReadOnlyList<ProbeResult> ProbeResults,
+    string? Error);
+
+public sealed record LivePickerResult(
+    IspInfo? DetectedIsp,
+    IReadOnlyList<LiveCandidate> Ranked);
 
 public sealed class StrategyPicker
 {
@@ -120,5 +151,136 @@ public sealed class StrategyPicker
         });
 
         return new PickerResult(detected, candidates);
+    }
+
+    /// <summary>
+    /// Runs each ranked candidate live: spawn winws.exe with its compiled
+    /// args, wait for stabilization, probe, score, kill. Returns candidates
+    /// sorted by score DESC.
+    /// </summary>
+    /// <param name="opts">Same options as <see cref="RunAsync"/>.</param>
+    /// <param name="probe">Connection probe (real or mocked).</param>
+    /// <param name="processFactory">Creates a fresh <see cref="IWinwsProcess"/> per iteration.</param>
+    /// <param name="live">Live-mode settings (winws path, dirs, timeouts).</param>
+    public async Task<LivePickerResult> RunLiveAsync(
+        PickerOptions opts,
+        IConnectionProbe probe,
+        Func<IWinwsProcess> processFactory,
+        LivePickerSettings live,
+        CancellationToken ct = default)
+    {
+        var dry = await RunAsync(opts, ct);
+
+        var liveResults = new List<LiveCandidate>(dry.Candidates.Count);
+        var compileOpts = new CompileOptions
+        {
+            BinDir       = live.BinDir,
+            ListsDir     = live.ListsDir,
+            GameTcpPorts = live.GameTcpPorts,
+            GameUdpPorts = live.GameUdpPorts,
+        };
+        var compiler = new WinwsCompiler(compileOpts);
+        var targets  = live.Targets ?? ConnectionProbe.DefaultTargets;
+
+        foreach (var candidate in dry.Candidates)
+        {
+            ct.ThrowIfCancellationRequested();
+            var item = await EvaluateOneAsync(candidate, opts.StrategiesDir, compiler, probe, processFactory, live, targets, ct);
+            liveResults.Add(item);
+        }
+
+        liveResults.Sort((a, b) => b.Score.CompareTo(a.Score));
+        return new LivePickerResult(dry.DetectedIsp, liveResults);
+    }
+
+    private static async Task<LiveCandidate> EvaluateOneAsync(
+        PickerCandidate candidate,
+        string strategiesDir,
+        WinwsCompiler compiler,
+        IConnectionProbe probe,
+        Func<IWinwsProcess> processFactory,
+        LivePickerSettings live,
+        IReadOnlyList<ProbeTarget> targets,
+        CancellationToken outerCt)
+    {
+        using var perStratCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+        perStratCts.CancelAfter(live.PerStrategyTimeout);
+        var ct = perStratCts.Token;
+
+        string fullPath = Path.Combine(strategiesDir, candidate.File);
+        Strategy strategy;
+        try
+        {
+            strategy = StrategyLoader.LoadFromFile(fullPath);
+        }
+        catch (Exception ex)
+        {
+            return new LiveCandidate(candidate, 0, Array.Empty<ProbeResult>(), $"load failed: {ex.Message}");
+        }
+
+        string args;
+        try
+        {
+            args = compiler.Compile(strategy);
+        }
+        catch (Exception ex)
+        {
+            return new LiveCandidate(candidate, 0, Array.Empty<ProbeResult>(), $"compile failed: {ex.Message}");
+        }
+
+        var proc = processFactory();
+        try
+        {
+            bool started;
+            try
+            {
+                started = await proc.StartAsync(live.WinwsExePath, args, ct);
+            }
+            catch (Exception ex)
+            {
+                return new LiveCandidate(candidate, 0, Array.Empty<ProbeResult>(), $"start failed: {ex.Message}");
+            }
+
+            if (!started)
+            {
+                return new LiveCandidate(candidate, 0, Array.Empty<ProbeResult>(),
+                    proc.LastError ?? "winws exited immediately");
+            }
+
+            try
+            {
+                await Task.Delay(live.StabilizationWait, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return new LiveCandidate(candidate, 0, Array.Empty<ProbeResult>(), "per-strategy timeout during stabilization");
+            }
+
+            IReadOnlyList<ProbeResult> probeResults;
+            try
+            {
+                probeResults = await probe.RunAsync(new ProbeOptions
+                {
+                    Targets   = targets,
+                    SkipPing  = false,
+                    TimeoutMs = 3000,
+                }, ct);
+            }
+            catch (Exception ex)
+            {
+                return new LiveCandidate(candidate, 0, Array.Empty<ProbeResult>(), $"probe failed: {ex.Message}");
+            }
+
+            double score = probeResults.Count == 0
+                ? 0
+                : probeResults.Average(r => r.Score);
+
+            return new LiveCandidate(candidate, score, probeResults, null);
+        }
+        finally
+        {
+            try { await proc.StopAsync(CancellationToken.None); } catch { }
+            try { await proc.DisposeAsync(); } catch { }
+        }
     }
 }

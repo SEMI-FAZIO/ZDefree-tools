@@ -27,12 +27,15 @@ Usage: zdefree <command> [options]
 Commands:
   compile <strategy.json>            Compile a strategy to a winws.exe command line
   bat2json <input.bat> [output.json] Convert a Flowseal .bat into a ZDefree strategy
-  bootstrap [--out <dir>]            Download winws.exe + WinDivert + lists into a ZDefree folder
+  bootstrap [--out <dir>] [--include-nfqws]
+                                     Download winws.exe + WinDivert + lists; optionally nfqws (Linux)
   lists [--out <dir>]                Download domain/IP lists from 1andrevich/Re-filter-lists
   index [--strategies-dir <dir>]     (Re)generate strategies/INDEX.json catalog
   probe [--target <host>]...         Measure HTTPS+ping latency to target hosts
   isp [--json]                       Detect external IP + ASN/ISP via ipinfo.io
-  pick [--isp auto|<tag>] [--dry-run] Rank strategies (ISP-matched first)
+  pick [--isp auto|<tag>] [--dry-run | --live]
+                                     Rank strategies (ISP-matched first; live = spawn winws + probe each)
+  watch [--strategies-dir <dir>]     Watch strategy files for changes and stream events
   version                            Print version
   help [command]                     Show help
 
@@ -48,12 +51,15 @@ Examples:
 Команды:
   compile <strategy.json>            Скомпилировать стратегию в командную строку winws.exe
   bat2json <input.bat> [output.json] Конвертировать .bat Flowseal в стратегию ZDefree
-  bootstrap [--out <каталог>]        Скачать winws.exe + WinDivert + списки в папку ZDefree
+  bootstrap [--out <каталог>] [--include-nfqws]
+                                     Скачать winws.exe + WinDivert + списки; опционально nfqws (Linux)
   lists [--out <каталог>]            Скачать списки доменов/IP из 1andrevich/Re-filter-lists
   index [--strategies-dir <каталог>] (Пере)генерировать каталог strategies/INDEX.json
   probe [--target <хост>]...         Измерить HTTPS+ping латентность до хостов
   isp [--json]                       Определить внешний IP + ASN/ISP через ipinfo.io
-  pick [--isp auto|<тег>] [--dry-run] Ранжировать стратегии (ISP-совпадения сверху)
+  pick [--isp auto|<тег>] [--dry-run | --live]
+                                     Ранжировать стратегии (ISP-совпадения сверху; live = запуск winws + probe)
+  watch [--strategies-dir <каталог>] Следить за изменениями стратегий и стримить события
   version                            Показать версию
   help [команда]                     Показать справку
 
