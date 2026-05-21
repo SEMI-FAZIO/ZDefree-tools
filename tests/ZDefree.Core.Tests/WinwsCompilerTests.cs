@@ -138,6 +138,24 @@ public class WinwsCompilerTests
     }
 
     [Fact]
+    public void Hostlist_uses_list_prefix_and_ipset_uses_ipset_prefix()
+    {
+        var cli = CompileFixture("general.json");
+
+        // Rule 1: hostlist=[general, general-user] + ipset_exclude=[exclude, exclude-user]
+        Assert.Contains(@"--hostlist=""lists\list-general.txt""", cli);
+        Assert.Contains(@"--hostlist=""lists\list-general-user.txt""", cli);
+        Assert.Contains(@"--hostlist-exclude=""lists\list-exclude.txt""", cli);
+        Assert.Contains(@"--hostlist-exclude=""lists\list-exclude-user.txt""", cli);
+        Assert.Contains(@"--ipset-exclude=""lists\ipset-exclude.txt""", cli);
+        Assert.Contains(@"--ipset-exclude=""lists\ipset-exclude-user.txt""", cli);
+
+        // Rule 6: ipset=all -> ipset-all.txt (NOT list-all.txt)
+        Assert.Contains(@"--ipset=""lists\ipset-all.txt""", cli);
+        Assert.DoesNotContain(@"--ipset=""lists\list-all.txt""", cli);
+    }
+
+    [Fact]
     public void Empty_strategy_throws_on_compile()
     {
         const string json = """

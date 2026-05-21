@@ -100,22 +100,22 @@ public sealed class WinwsCompiler
 
         if (rule.Hostlist is { Count: > 0 })
             foreach (var l in rule.Hostlist)
-                args.Add($"--hostlist={Quote(ResolveList(l))}");
+                args.Add($"--hostlist={Quote(ResolveList(l, "list-"))}");
 
         if (rule.HostlistExclude is { Count: > 0 })
             foreach (var l in rule.HostlistExclude)
-                args.Add($"--hostlist-exclude={Quote(ResolveList(l))}");
+                args.Add($"--hostlist-exclude={Quote(ResolveList(l, "list-"))}");
 
         if (rule.HostlistDomains is { Count: > 0 })
             args.Add($"--hostlist-domains={string.Join(',', rule.HostlistDomains)}");
 
         if (rule.Ipset is { Count: > 0 })
             foreach (var l in rule.Ipset)
-                args.Add($"--ipset={Quote(ResolveList(l))}");
+                args.Add($"--ipset={Quote(ResolveList(l, "ipset-"))}");
 
         if (rule.IpsetExclude is { Count: > 0 })
             foreach (var l in rule.IpsetExclude)
-                args.Add($"--ipset-exclude={Quote(ResolveList(l))}");
+                args.Add($"--ipset-exclude={Quote(ResolveList(l, "ipset-"))}");
 
         if (!string.IsNullOrEmpty(rule.IpId))
             args.Add($"--ip-id={rule.IpId}");
@@ -241,14 +241,14 @@ public sealed class WinwsCompiler
         }
     }
 
-    private string ResolveList(ListRef r)
+    private string ResolveList(ListRef r, string filePrefix)
     {
         if (r.Path is not null) return r.Path;
         if (r.Pack is null) throw new InvalidOperationException("ListRef has neither pack nor path");
 
         string fname = r.Pack.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
             ? r.Pack
-            : $"list-{r.Pack}.txt";
+            : $"{filePrefix}{r.Pack}.txt";
 
         return NormalizePath(_opt.ListsDir + fname);
     }
