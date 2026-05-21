@@ -64,8 +64,8 @@ Examples:
         "Использование: zdefree bat2json <input.bat> [output.json] [--id <идентификатор>] [--name <имя>]");
 
     public static string BootstrapUsage => Get(
-        "Usage: zdefree bootstrap [--out <dir>] [--skip-winws] [--skip-windivert] [--arch x64|x86|arm64]",
-        "Использование: zdefree bootstrap [--out <каталог>] [--skip-winws] [--skip-windivert] [--arch x64|x86|arm64]");
+        "Usage: zdefree bootstrap [--out <dir>] [--skip-winws] [--skip-windivert] [--skip-patterns] [--arch x64|x86|arm64]",
+        "Использование: zdefree bootstrap [--out <каталог>] [--skip-winws] [--skip-windivert] [--skip-patterns] [--arch x64|x86|arm64]");
 
     public static string BootstrapHeader(string dir) => Get(
         $"Bootstrapping ZDefree distribution into {dir}",

@@ -11,6 +11,10 @@ public sealed class BootstrapRunner : IDisposable
     private const string WinDivertOwner = "basil00";
     private const string WinDivertRepo  = "WinDivert";
 
+    private const string PatternsOwner  = "Flowseal";
+    private const string PatternsRepo   = "zapret-discord-youtube";
+    private const string PatternsPath   = "bin";
+
     private readonly GitHubClient _gh;
     private readonly bool _ownsClient;
 
@@ -42,6 +46,11 @@ public sealed class BootstrapRunner : IDisposable
         if (options.DownloadWinDivert)
         {
             await InstallWinDivertAsync(options, result, ct);
+        }
+
+        if (options.DownloadPatterns)
+        {
+            await InstallPatternsAsync(options, result, ct);
         }
 
         await WriteVersionFileAsync(options, result, ct);
@@ -178,6 +187,57 @@ public sealed class BootstrapRunner : IDisposable
         if (name == "license" || name == "license.txt") return true;
 
         return false;
+    }
+
+    private async Task InstallPatternsAsync(BootstrapOptions opt, BootstrapResult result, CancellationToken ct)
+    {
+        Report(opt, "patterns", $"Listing {PatternsOwner}/{PatternsRepo}/{PatternsPath}");
+
+        List<GitHubFileInfo> files;
+        try
+        {
+            files = await _gh.ListDirectoryAsync(PatternsOwner, PatternsRepo, PatternsPath, ct: ct);
+        }
+        catch (Exception ex)
+        {
+            result.Warnings.Add($"Patterns: failed to list {PatternsOwner}/{PatternsRepo}/{PatternsPath}: {ex.Message}");
+            return;
+        }
+
+        var binFiles = files
+            .Where(f => string.Equals(f.Type, "file", StringComparison.OrdinalIgnoreCase))
+            .Where(f => f.Name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (binFiles.Count == 0)
+        {
+            result.Warnings.Add($"Patterns: no .bin files found in {PatternsOwner}/{PatternsRepo}/{PatternsPath}.");
+            return;
+        }
+
+        string binDir = Path.Combine(opt.TargetDir, "bin");
+        Directory.CreateDirectory(binDir);
+
+        int i = 0;
+        foreach (var f in binFiles)
+        {
+            i++;
+            int pct = (int)(100.0 * i / binFiles.Count);
+            Report(opt, "patterns", $"Downloading {f.Name} ({i}/{binFiles.Count})", pct);
+
+            if (string.IsNullOrEmpty(f.DownloadUrl))
+            {
+                result.Warnings.Add($"Patterns: skipped {f.Name} (no download_url).");
+                continue;
+            }
+
+            string dest = Path.Combine(binDir, f.Name);
+            if (File.Exists(dest)) continue;
+
+            await _gh.DownloadToFileAsync(f.DownloadUrl, dest, expectedSha256: null, progress: null, ct);
+            result.InstalledFiles.Add(Path.GetRelativePath(opt.TargetDir, dest));
+            result.PatternsInstalled++;
+        }
     }
 
     private async Task<string?> TryGetLatestCommitShaAsync(string owner, string repo, CancellationToken ct)

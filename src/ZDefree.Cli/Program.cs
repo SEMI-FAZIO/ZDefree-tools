@@ -136,6 +136,7 @@ namespace ZDefree.Cli
             string outDir = ReadOption(args, "--out") ?? ".";
             bool skipWinws = args.Contains("--skip-winws");
             bool skipWinDivert = args.Contains("--skip-windivert");
+            bool skipPatterns = args.Contains("--skip-patterns");
             string? archStr = ReadOption(args, "--arch");
 
             var arch = archStr?.ToLowerInvariant() switch
@@ -152,6 +153,7 @@ namespace ZDefree.Cli
                 TargetDir = outDir,
                 DownloadWinws = !skipWinws,
                 DownloadWinDivert = !skipWinDivert,
+                DownloadPatterns = !skipPatterns,
                 Arch = arch,
                 Progress = new Progress<BootstrapProgress>(p =>
                 {
