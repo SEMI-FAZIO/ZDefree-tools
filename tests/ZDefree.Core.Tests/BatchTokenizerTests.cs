@@ -64,7 +64,12 @@ public class BatchTokenizerTests
     [Fact]
     public void Decode_falls_back_to_cp866_on_invalid_utf8()
     {
-        byte[] cp866Russian = { 0xCF, 0xF0, 0xE8, 0xE2, 0xE5, 0xF2 };
+        // "Привет" in cp866:
+        //   П = 0x8F, р = 0xE0, и = 0xA8, в = 0xA2, е = 0xA5, т = 0xE2.
+        // 0x8F as a leading byte is invalid UTF-8 (it's a continuation byte
+        // start pattern), so strict UTF-8 decode fails and we fall through
+        // to the cp866 path.
+        byte[] cp866Russian = { 0x8F, 0xE0, 0xA8, 0xA2, 0xA5, 0xE2 };
         string decoded = BatchTokenizer.DecodeBytes(cp866Russian);
         Assert.Equal("Привет", decoded);
     }

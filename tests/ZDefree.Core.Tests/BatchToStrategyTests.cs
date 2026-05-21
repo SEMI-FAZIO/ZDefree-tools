@@ -33,7 +33,9 @@ public class BatchToStrategyTests
 
         Assert.Equal("443", r.Match?.Udp);
         Assert.NotNull(r.Hostlist);
-        Assert.Equal("general", r.Hostlist!.Pack);
+        Assert.Equal(2, r.Hostlist!.Count);
+        Assert.Equal("general", r.Hostlist[0].Pack);
+        Assert.Equal("general-user", r.Hostlist[1].Pack);
         Assert.Equal("fake", r.Desync?.Mode);
         Assert.Equal(6, r.Desync?.Repeats);
         Assert.Contains("quic_initial_www_google_com.bin", r.Desync?.FakeQuic);
@@ -71,7 +73,8 @@ public class BatchToStrategyTests
         var r = s.Filters[0].Rules[3];
 
         Assert.Equal("zero", r.IpId);
-        Assert.Equal("google", r.Hostlist?.Pack);
+        Assert.Single(r.Hostlist!);
+        Assert.Equal("google", r.Hostlist![0].Pack);
     }
 
     [Fact]

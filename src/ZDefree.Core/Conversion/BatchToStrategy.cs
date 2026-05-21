@@ -57,10 +57,10 @@ public static class BatchToStrategy
         var advanced = new DesyncAdvanced();
         bool matchUsed = false, desyncUsed = false, advancedUsed = false;
 
-        ListRef? hostlist = null;
-        ListRef? hostlistExclude = null;
-        ListRef? ipset = null;
-        ListRef? ipsetExclude = null;
+        List<ListRef>? hostlist = null;
+        List<ListRef>? hostlistExclude = null;
+        List<ListRef>? ipset = null;
+        List<ListRef>? ipsetExclude = null;
         List<string>? hostlistDomains = null;
         string? ipId = null;
 
@@ -90,13 +90,17 @@ public static class BatchToStrategy
                     matchUsed = true; break;
                 case "--ssid-filter":     match.SsidFilter = value; matchUsed = true; break;
 
-                case "--hostlist":            hostlist = MakeListRef(value, "list-", ".txt"); break;
-                case "--hostlist-exclude":    hostlistExclude = MakeListRef(value, "list-", ".txt"); break;
+                case "--hostlist":
+                    AppendListRef(ref hostlist, value, "list-", ".txt"); break;
+                case "--hostlist-exclude":
+                    AppendListRef(ref hostlistExclude, value, "list-", ".txt"); break;
                 case "--hostlist-domains":
                     hostlistDomains = value?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
                     break;
-                case "--ipset":               ipset = MakeListRef(value, "ipset-", ".txt"); break;
-                case "--ipset-exclude":       ipsetExclude = MakeListRef(value, "ipset-", ".txt"); break;
+                case "--ipset":
+                    AppendListRef(ref ipset, value, "ipset-", ".txt"); break;
+                case "--ipset-exclude":
+                    AppendListRef(ref ipsetExclude, value, "ipset-", ".txt"); break;
                 case "--ip-id":               ipId = value; break;
 
                 case "--dpi-desync":              desync.Mode = value; desyncUsed = true; break;
@@ -210,6 +214,14 @@ public static class BatchToStrategy
         }
 
         return new ListRef { Path = raw };
+    }
+
+    private static void AppendListRef(ref List<ListRef>? target, string? raw, string filePrefix, string fileSuffix)
+    {
+        var item = MakeListRef(raw, filePrefix, fileSuffix);
+        if (item is null) return;
+        target ??= new();
+        target.Add(item);
     }
 
     private static int? ParseInt(string? s)

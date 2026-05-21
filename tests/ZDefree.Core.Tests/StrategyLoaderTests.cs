@@ -61,12 +61,24 @@ public class StrategyLoaderTests
     }
 
     [Fact]
-    public void Listref_accepts_plain_pack_name()
+    public void Listref_array_form_loads_multiple_packs()
     {
         var s = StrategyLoader.LoadFromFile(FixturePath("general.json"));
         var rule0 = s.Filters[0].Rules[0];
         Assert.NotNull(rule0.Hostlist);
-        Assert.Equal("general", rule0.Hostlist!.Pack);
+        Assert.Equal(2, rule0.Hostlist!.Count);
+        Assert.Equal("general", rule0.Hostlist[0].Pack);
+        Assert.Equal("general-user", rule0.Hostlist[1].Pack);
+    }
+
+    [Fact]
+    public void Listref_singleton_string_loads_as_single_element_list()
+    {
+        var s = StrategyLoader.LoadFromFile(FixturePath("general.json"));
+        var rule3 = s.Filters[0].Rules[3];
+        Assert.NotNull(rule3.Hostlist);
+        Assert.Single(rule3.Hostlist!);
+        Assert.Equal("google", rule3.Hostlist![0].Pack);
     }
 
     [Fact]

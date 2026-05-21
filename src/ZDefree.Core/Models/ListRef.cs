@@ -73,3 +73,54 @@ internal sealed class ListRefConverter : JsonConverter<ListRef>
         writer.WriteEndObject();
     }
 }
+
+// Accepts a single ListRef (string or object) or an array of either,
+// and always materializes to List<ListRef>. Serializes a 1-element list
+// back to a single string/object for readability — only writes an array
+// when there are 2+ entries.
+internal sealed class ListRefArrayConverter : JsonConverter<List<ListRef>>
+{
+    public override List<ListRef>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        if (reader.TokenType == JsonTokenType.StartArray)
+        {
+            var list = new List<ListRef>();
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                {
+                    return list;
+                }
+                var item = JsonSerializer.Deserialize<ListRef>(ref reader, options)
+                    ?? throw new JsonException("Null ListRef in array");
+                list.Add(item);
+            }
+            throw new JsonException("Unexpected end of ListRef array");
+        }
+
+        var single = JsonSerializer.Deserialize<ListRef>(ref reader, options)
+            ?? throw new JsonException("Null ListRef");
+        return new List<ListRef> { single };
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<ListRef> value, JsonSerializerOptions options)
+    {
+        if (value.Count == 1)
+        {
+            JsonSerializer.Serialize(writer, value[0], options);
+            return;
+        }
+
+        writer.WriteStartArray();
+        foreach (var item in value)
+        {
+            JsonSerializer.Serialize(writer, item, options);
+        }
+        writer.WriteEndArray();
+    }
+}

@@ -98,20 +98,24 @@ public sealed class WinwsCompiler
             if (!string.IsNullOrEmpty(m.SsidFilter)) args.Add($"--ssid-filter={m.SsidFilter}");
         }
 
-        if (rule.Hostlist is not null)
-            args.Add($"--hostlist={Quote(ResolveList(rule.Hostlist))}");
+        if (rule.Hostlist is { Count: > 0 })
+            foreach (var l in rule.Hostlist)
+                args.Add($"--hostlist={Quote(ResolveList(l))}");
 
-        if (rule.HostlistExclude is not null)
-            args.Add($"--hostlist-exclude={Quote(ResolveList(rule.HostlistExclude))}");
+        if (rule.HostlistExclude is { Count: > 0 })
+            foreach (var l in rule.HostlistExclude)
+                args.Add($"--hostlist-exclude={Quote(ResolveList(l))}");
 
         if (rule.HostlistDomains is { Count: > 0 })
             args.Add($"--hostlist-domains={string.Join(',', rule.HostlistDomains)}");
 
-        if (rule.Ipset is not null)
-            args.Add($"--ipset={Quote(ResolveList(rule.Ipset))}");
+        if (rule.Ipset is { Count: > 0 })
+            foreach (var l in rule.Ipset)
+                args.Add($"--ipset={Quote(ResolveList(l))}");
 
-        if (rule.IpsetExclude is not null)
-            args.Add($"--ipset-exclude={Quote(ResolveList(rule.IpsetExclude))}");
+        if (rule.IpsetExclude is { Count: > 0 })
+            foreach (var l in rule.IpsetExclude)
+                args.Add($"--ipset-exclude={Quote(ResolveList(l))}");
 
         if (!string.IsNullOrEmpty(rule.IpId))
             args.Add($"--ip-id={rule.IpId}");

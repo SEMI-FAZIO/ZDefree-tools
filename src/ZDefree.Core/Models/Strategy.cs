@@ -80,19 +80,23 @@ public sealed class Rule
     public MatchBlock? Match { get; set; }
 
     [JsonPropertyName("hostlist")]
-    public ListRef? Hostlist { get; set; }
+    [JsonConverter(typeof(ListRefArrayConverter))]
+    public List<ListRef>? Hostlist { get; set; }
 
     [JsonPropertyName("hostlist_exclude")]
-    public ListRef? HostlistExclude { get; set; }
+    [JsonConverter(typeof(ListRefArrayConverter))]
+    public List<ListRef>? HostlistExclude { get; set; }
 
     [JsonPropertyName("hostlist_domains")]
     public List<string>? HostlistDomains { get; set; }
 
     [JsonPropertyName("ipset")]
-    public ListRef? Ipset { get; set; }
+    [JsonConverter(typeof(ListRefArrayConverter))]
+    public List<ListRef>? Ipset { get; set; }
 
     [JsonPropertyName("ipset_exclude")]
-    public ListRef? IpsetExclude { get; set; }
+    [JsonConverter(typeof(ListRefArrayConverter))]
+    public List<ListRef>? IpsetExclude { get; set; }
 
     [JsonPropertyName("ip_id")]
     public string? IpId { get; set; }

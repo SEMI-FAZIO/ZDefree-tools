@@ -27,9 +27,9 @@
       "rules": [
         {
           "match": { "udp": "443" },
-          "hostlist": "general",
-          "hostlist_exclude": "exclude",
-          "ipset_exclude": "exclude",
+          "hostlist": ["general", "general-user"],
+          "hostlist_exclude": ["exclude", "exclude-user"],
+          "ipset_exclude": ["exclude", "exclude-user"],
           "desync": {
             "mode": "fake",
             "repeats": 6,
@@ -75,9 +75,9 @@
 
         {
           "match": { "tcp": "80,443" },
-          "hostlist": "general",
-          "hostlist_exclude": "exclude",
-          "ipset_exclude": "exclude",
+          "hostlist": ["general", "general-user"],
+          "hostlist_exclude": ["exclude", "exclude-user"],
+          "ipset_exclude": ["exclude", "exclude-user"],
           "desync": {
             "mode": "multisplit",
             "split_pos": "1",
@@ -89,8 +89,8 @@
         {
           "match": { "udp": "443" },
           "ipset": "all",
-          "hostlist_exclude": "exclude",
-          "ipset_exclude": "exclude",
+          "hostlist_exclude": ["exclude", "exclude-user"],
+          "ipset_exclude": ["exclude", "exclude-user"],
           "desync": {
             "mode": "fake",
             "repeats": 6,
@@ -101,8 +101,8 @@
         {
           "match": { "tcp": "80,443,8443" },
           "ipset": "all",
-          "hostlist_exclude": "exclude",
-          "ipset_exclude": "exclude",
+          "hostlist_exclude": ["exclude", "exclude-user"],
+          "ipset_exclude": ["exclude", "exclude-user"],
           "desync": {
             "mode": "multisplit",
             "split_pos": "1",
@@ -114,7 +114,7 @@
         {
           "match": { "tcp": "{game_tcp}" },
           "ipset": "all",
-          "ipset_exclude": "exclude",
+          "ipset_exclude": ["exclude", "exclude-user"],
           "desync": {
             "mode": "multisplit",
             "any_protocol": true,
@@ -130,7 +130,7 @@
         {
           "match": { "udp": "{game_udp}" },
           "ipset": "all",
-          "ipset_exclude": "exclude",
+          "ipset_exclude": ["exclude", "exclude-user"],
           "desync": {
             "mode": "fake",
             "repeats": 12,
