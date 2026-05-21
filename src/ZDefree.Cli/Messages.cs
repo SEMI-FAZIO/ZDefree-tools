@@ -36,6 +36,7 @@ Commands:
   pick [--isp auto|<tag>] [--dry-run | --live]
                                      Rank strategies (ISP-matched first; live = spawn winws + probe each)
   watch [--strategies-dir <dir>]     Watch strategy files for changes and stream events
+  module <list|add|remove|...>       Manage strategy-pack modules
   version                            Print version
   help [command]                     Show help
 
@@ -60,6 +61,7 @@ Examples:
   pick [--isp auto|<тег>] [--dry-run | --live]
                                      Ранжировать стратегии (ISP-совпадения сверху; live = запуск winws + probe)
   watch [--strategies-dir <каталог>] Следить за изменениями стратегий и стримить события
+  module <list|add|remove|...>       Управление модулями (strategy-packs)
   version                            Показать версию
   help [команда]                     Показать справку
 
@@ -134,6 +136,32 @@ Examples:
     public static string ListsDone(int packCount) => Get(
         $"Done. Installed {packCount} list pack(s).",
         $"Готово. Установлено пакетов списков: {packCount}.");
+
+    public static string ModuleUsage => Get("""
+Usage: zdefree module <subcommand>
+
+Subcommands:
+  list                                 Show all installed modules
+  add <path>                           Add a local module directory (must contain module.json)
+  remove <name>                        Delete the module dir
+  trust <name>     / untrust <name>    Toggle trusted flag (untrusted modules are skipped by index)
+  enable <name>    / disable <name>    Toggle enabled flag
+
+Global options:
+  --strategies-dir <dir>               Override strategies/ root (default: ./strategies)
+""", """
+Использование: zdefree module <субкоманда>
+
+Субкоманды:
+  list                                 Список установленных модулей
+  add <путь>                           Добавить локальный модуль (нужен module.json)
+  remove <имя>                         Удалить модуль
+  trust <имя>      / untrust <имя>     Переключить флаг доверия (untrusted модули в index не попадают)
+  enable <имя>     / disable <имя>     Переключить флаг включения
+
+Глобальные параметры:
+  --strategies-dir <каталог>           Переопределить корень strategies/ (по умолчанию ./strategies)
+""");
 
     public static string ProbeUsage => Get(
         "Usage: zdefree probe [--target <host[:port]>]... [--timeout-ms N] [--no-ping] [--json]",

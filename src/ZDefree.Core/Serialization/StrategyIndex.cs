@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ZDefree.Core.Models;
+using ZDefree.Core.Modules;
 
 namespace ZDefree.Core.Serialization;
 
@@ -12,6 +13,12 @@ public sealed class StrategyIndexEntry
     [JsonPropertyName("category")]    public string?    Category    { get; init; }
     [JsonPropertyName("description")] public I18nText?  Description { get; init; }
     [JsonPropertyName("file")]        public string     File        { get; init; } = "";
+
+    /// <summary>
+    /// Origin: <c>"core"</c> for base catalog strategies, otherwise the module name.
+    /// Added in schema_version 2 — older readers ignore it.
+    /// </summary>
+    [JsonPropertyName("source")]      public string?    Source      { get; init; }
 }
 
 public sealed class StrategyIndex
@@ -42,6 +49,15 @@ public static class StrategyIndexBuilder
     };
 
     public static StrategyIndex Build(string strategiesRoot, string generator)
+        => Build(strategiesRoot, generator, out _);
+
+    /// <summary>
+    /// Composes the catalog from base <c>common/</c>+<c>advanced/</c> plus every
+    /// enabled+trusted module under <c>modules/&lt;name&gt;/</c>. Conflicts
+    /// (same id) are resolved core-first, then module name asc; collisions are
+    /// reported via <paramref name="warnings"/>.
+    /// </summary>
+    public static StrategyIndex Build(string strategiesRoot, string generator, out IReadOnlyList<string> warnings)
     {
         if (!Directory.Exists(strategiesRoot))
         {
@@ -49,28 +65,28 @@ public static class StrategyIndexBuilder
         }
 
         var entries = new List<StrategyIndexEntry>();
+        var ids     = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var warnList = new List<string>();
 
-        foreach (var subdir in new[] { "common", "advanced" })
+        // 1. Base catalog (source = "core")
+        AddFrom(strategiesRoot, basePath: strategiesRoot, source: "core", entries, ids, warnList,
+                pathInIndex: subPath => subPath);
+
+        // 2. Modules (source = module name) — enabled + trusted only.
+        var modules = ModuleRegistry.ListAll(strategiesRoot, warnList);
+        foreach (var m in modules.Where(m => m.Definition.Enabled && m.Definition.Trusted))
         {
-            string dir = Path.Combine(strategiesRoot, subdir);
-            if (!Directory.Exists(dir)) continue;
+            string moduleStrategies = m.Path; // strategies live under modules/<name>/{common,advanced}
+            // The "file" field is relative to the strategies root, so it's "modules/<name>/<subdir>/<file>".
+            string moduleRel = Path.Combine("modules", m.Definition.Name).Replace('\\', '/');
+            AddFrom(strategiesRoot, basePath: moduleStrategies, source: m.Definition.Name, entries, ids, warnList,
+                    pathInIndex: subPath => $"{moduleRel}/{subPath}");
+        }
 
-            foreach (var file in Directory.EnumerateFiles(dir, "*.json", SearchOption.TopDirectoryOnly))
-            {
-                string name = Path.GetFileName(file);
-                if (name.Equals("INDEX.json", StringComparison.OrdinalIgnoreCase)) continue;
-                if (name.EndsWith(".schema.json", StringComparison.OrdinalIgnoreCase)) continue;
-
-                var s = StrategyLoader.LoadFromFile(file);
-                entries.Add(new StrategyIndexEntry
-                {
-                    Id          = s.Id,
-                    Name        = s.Name,
-                    Category    = s.Category,
-                    Description = s.Description,
-                    File        = $"{subdir}/{name}",
-                });
-            }
+        // Untrusted-but-enabled modules: surface a warning so the user sees why they aren't included.
+        foreach (var m in modules.Where(m => m.Definition.Enabled && !m.Definition.Trusted))
+        {
+            warnList.Add($"Module '{m.Definition.Name}' is enabled but not trusted — strategies excluded from INDEX. Run `zdefree module trust {m.Definition.Name}` to include.");
         }
 
         entries.Sort((a, b) =>
@@ -79,12 +95,56 @@ public static class StrategyIndexBuilder
             return c != 0 ? c : string.Compare(a.Id, b.Id, StringComparison.Ordinal);
         });
 
+        warnings = warnList;
         return new StrategyIndex
         {
             GeneratedAt = DateTimeOffset.UtcNow,
             Generator   = generator,
             Strategies  = entries,
         };
+    }
+
+    private static void AddFrom(
+        string strategiesRoot,
+        string basePath,
+        string source,
+        List<StrategyIndexEntry> entries,
+        HashSet<string> ids,
+        List<string> warnings,
+        Func<string, string> pathInIndex)
+    {
+        foreach (var subdir in new[] { "common", "advanced" })
+        {
+            string dir = Path.Combine(basePath, subdir);
+            if (!Directory.Exists(dir)) continue;
+
+            foreach (var file in Directory.EnumerateFiles(dir, "*.json", SearchOption.TopDirectoryOnly))
+            {
+                string name = Path.GetFileName(file);
+                if (name.Equals("INDEX.json", StringComparison.OrdinalIgnoreCase)) continue;
+                if (name.EndsWith(".schema.json", StringComparison.OrdinalIgnoreCase)) continue;
+
+                Strategy s;
+                try { s = StrategyLoader.LoadFromFile(file); }
+                catch (Exception ex) { warnings.Add($"[{source}] {subdir}/{name} failed to load: {ex.Message}"); continue; }
+
+                if (!ids.Add(s.Id))
+                {
+                    warnings.Add($"[{source}] id '{s.Id}' already taken by an earlier source — skipped.");
+                    continue;
+                }
+
+                entries.Add(new StrategyIndexEntry
+                {
+                    Id          = s.Id,
+                    Name        = s.Name,
+                    Category    = s.Category,
+                    Description = s.Description,
+                    File        = pathInIndex($"{subdir}/{name}"),
+                    Source      = source,
+                });
+            }
+        }
     }
 
     public static string Serialize(StrategyIndex index)
@@ -113,6 +173,7 @@ public static class StrategyIndexBuilder
             if (x.Name != y.Name) return false;
             if (x.Category != y.Category) return false;
             if (x.File != y.File) return false;
+            if (x.Source != y.Source) return false;
             if (!I18nEquivalent(x.Description, y.Description)) return false;
         }
         return true;

@@ -3,6 +3,7 @@ using ZDefree.Cli;
 using ZDefree.Core.Bootstrap;
 using ZDefree.Core.Compilation;
 using ZDefree.Core.Conversion;
+using ZDefree.Core.Modules;
 using ZDefree.Core.Probing;
 using ZDefree.Core.Serialization;
 using ZDefree.Core.Watching;
@@ -39,6 +40,7 @@ namespace ZDefree.Cli
                     "isp"       => RunIsp(rest).GetAwaiter().GetResult(),
                     "pick"      => RunPick(rest).GetAwaiter().GetResult(),
                     "watch"     => RunWatch(rest).GetAwaiter().GetResult(),
+                    "module"    => RunModule(rest),
                     "version"   => RunVersion(),
                     "help" or "--help" or "-h" or "/?" => RunHelp(rest),
                     _ => UnknownCommand(command),
@@ -515,6 +517,104 @@ namespace ZDefree.Cli
             Console.Error.WriteLine();
             Console.WriteLine(Messages.ListsDone(result.Packs.Count));
             return 0;
+        }
+
+        private static int RunModule(List<string> args)
+        {
+            if (args.Count == 0)
+            {
+                Console.Error.WriteLine(Messages.ModuleUsage);
+                return 2;
+            }
+
+            string sub = args[0].ToLowerInvariant();
+            var rest = args.Skip(1).ToList();
+            string strategiesDir = ReadOption(rest, "--strategies-dir") ?? "strategies";
+            if (!Directory.Exists(strategiesDir))
+            {
+                Console.Error.WriteLine(Messages.ErrFileNotFound(strategiesDir));
+                return 1;
+            }
+
+            try
+            {
+                return sub switch
+                {
+                    "list"    => RunModuleList(strategiesDir, rest),
+                    "add"     => RunModuleAdd(strategiesDir, rest),
+                    "remove"  => RunModuleSimple(strategiesDir, rest, "name", n => { ModuleService.Remove(strategiesDir, n); return $"Removed module '{n}'."; }),
+                    "trust"   => RunModuleSimple(strategiesDir, rest, "name", n => { ModuleService.SetTrusted(strategiesDir, n, true);  return $"Module '{n}' trusted."; }),
+                    "untrust" => RunModuleSimple(strategiesDir, rest, "name", n => { ModuleService.SetTrusted(strategiesDir, n, false); return $"Module '{n}' untrusted."; }),
+                    "enable"  => RunModuleSimple(strategiesDir, rest, "name", n => { ModuleService.SetEnabled(strategiesDir, n, true);  return $"Module '{n}' enabled."; }),
+                    "disable" => RunModuleSimple(strategiesDir, rest, "name", n => { ModuleService.SetEnabled(strategiesDir, n, false); return $"Module '{n}' disabled."; }),
+                    _         => UnknownModuleSubcommand(sub),
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"module {sub}: {ex.Message}");
+                return 1;
+            }
+        }
+
+        private static int RunModuleList(string strategiesDir, List<string> args)
+        {
+            bool json = args.Contains("--json");
+            var warnings = new List<string>();
+            var modules = ModuleService.List(strategiesDir, warnings);
+
+            if (json)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(modules, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            else if (modules.Count == 0)
+            {
+                Console.WriteLine("No modules installed.");
+            }
+            else
+            {
+                Console.WriteLine($"{"NAME",-24} {"VERSION",-10} {"KIND",-7} {"ENABLED",-8} {"TRUSTED",-8} SOURCE");
+                foreach (var m in modules)
+                {
+                    Console.WriteLine($"{m.Name,-24} {m.Version,-10} {m.SourceKind.ToString().ToLowerInvariant(),-7} {m.Enabled,-8} {m.Trusted,-8} {m.Source}");
+                }
+            }
+
+            foreach (var w in warnings) Console.Error.WriteLine($"warning: {w}");
+            return 0;
+        }
+
+        private static int RunModuleAdd(string strategiesDir, List<string> args)
+        {
+            string? source = args.FirstOrDefault(a => !a.StartsWith("--"));
+            if (source is null)
+            {
+                Console.Error.WriteLine("module add: missing <path>");
+                return 2;
+            }
+
+            var result = ModuleService.AddLocal(strategiesDir, source);
+            Console.WriteLine($"Added module '{result.Name}' at {result.Path}.");
+            foreach (var w in result.Warnings) Console.WriteLine($"  ! {w}");
+            return 0;
+        }
+
+        private static int RunModuleSimple(string strategiesDir, List<string> args, string argName, Func<string, string> op)
+        {
+            string? name = args.FirstOrDefault(a => !a.StartsWith("--"));
+            if (name is null)
+            {
+                Console.Error.WriteLine($"module: missing <{argName}>");
+                return 2;
+            }
+            Console.WriteLine(op(name));
+            return 0;
+        }
+
+        private static int UnknownModuleSubcommand(string sub)
+        {
+            Console.Error.WriteLine($"Unknown module subcommand: '{sub}'. Run 'zdefree module' for usage.");
+            return 2;
         }
 
         private static int RunIndex(List<string> args)
