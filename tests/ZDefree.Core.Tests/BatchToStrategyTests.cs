@@ -130,4 +130,46 @@ public class BatchToStrategyTests
         var result = BatchToStrategy.Convert(FlowsealFixture("general.bat"));
         Assert.Empty(result.Warnings);
     }
+
+    public static IEnumerable<object[]> AllFlowsealFixtures()
+    {
+        string dir = Path.Combine(AppContext.BaseDirectory, "fixtures", "flowseal");
+        foreach (var bat in Directory.EnumerateFiles(dir, "*.bat"))
+        {
+            yield return new object[] { Path.GetFileName(bat) };
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(AllFlowsealFixtures))]
+    public void Converts_flowseal_bat_with_zero_unknown_flag_warnings(string fileName)
+    {
+        var result = BatchToStrategy.Convert(FlowsealFixture(fileName));
+        var unknown = result.Warnings.Where(w => w.Contains("Unknown flag", StringComparison.Ordinal)).ToList();
+        Assert.Empty(unknown);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllFlowsealFixtures))]
+    public void Converted_flowseal_strategy_roundtrips_through_loader(string fileName)
+    {
+        var converted = BatchToStrategy.Convert(FlowsealFixture(fileName)).Strategy;
+        string json = StrategyLoader.Serialize(converted);
+        var reloaded = StrategyLoader.LoadFromString(json);
+
+        Assert.Equal(converted.Id, reloaded.Id);
+        Assert.Equal(converted.Filters.Count, reloaded.Filters.Count);
+        Assert.Equal(converted.Filters[0].Rules.Count, reloaded.Filters[0].Rules.Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllFlowsealFixtures))]
+    public void Converted_flowseal_strategy_compiles_to_nonempty_winws_cli(string fileName)
+    {
+        var converted = BatchToStrategy.Convert(FlowsealFixture(fileName)).Strategy;
+        string cli = new WinwsCompiler().Compile(converted);
+
+        Assert.False(string.IsNullOrWhiteSpace(cli));
+        Assert.Contains("--dpi-desync", cli);
+    }
 }

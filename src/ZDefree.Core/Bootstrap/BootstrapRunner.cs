@@ -53,6 +53,11 @@ public sealed class BootstrapRunner : IDisposable
             await InstallPatternsAsync(options, result, ct);
         }
 
+        if (options.DownloadLists)
+        {
+            await InstallListsAsync(options, result, ct);
+        }
+
         await WriteVersionFileAsync(options, result, ct);
 
         return result;
@@ -237,6 +242,25 @@ public sealed class BootstrapRunner : IDisposable
             await _gh.DownloadToFileAsync(f.DownloadUrl, dest, expectedSha256: null, progress: null, ct);
             result.InstalledFiles.Add(Path.GetRelativePath(opt.TargetDir, dest));
             result.PatternsInstalled++;
+        }
+    }
+
+    private async Task InstallListsAsync(BootstrapOptions opt, BootstrapResult result, CancellationToken ct)
+    {
+        var installer = new ListsInstaller(_gh);
+        var listsResult = await installer.InstallAsync(new ListsOptions
+        {
+            TargetDir = opt.TargetDir,
+            Progress  = opt.Progress,
+        }, ct);
+
+        foreach (var p in listsResult.Packs)
+        {
+            result.InstalledFiles.Add(p.File);
+        }
+        foreach (var w in listsResult.Warnings)
+        {
+            result.Warnings.Add($"lists: {w}");
         }
     }
 

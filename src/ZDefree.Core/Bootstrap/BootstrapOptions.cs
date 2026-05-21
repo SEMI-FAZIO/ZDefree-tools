@@ -15,6 +15,7 @@ public sealed class BootstrapOptions
     public bool DownloadWinws { get; init; } = true;
     public bool DownloadWinDivert { get; init; } = true;
     public bool DownloadPatterns { get; init; } = true;
+    public bool DownloadLists { get; init; } = true;
 
     public WinwsArch Arch { get; init; } = WinwsArch.Auto;
 

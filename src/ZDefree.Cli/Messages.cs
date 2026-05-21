@@ -27,7 +27,9 @@ Usage: zdefree <command> [options]
 Commands:
   compile <strategy.json>            Compile a strategy to a winws.exe command line
   bat2json <input.bat> [output.json] Convert a Flowseal .bat into a ZDefree strategy
-  bootstrap [--out <dir>]            Download winws.exe + WinDivert into a ZDefree folder
+  bootstrap [--out <dir>]            Download winws.exe + WinDivert + lists into a ZDefree folder
+  lists [--out <dir>]                Download domain/IP lists from 1andrevich/Re-filter-lists
+  index [--strategies-dir <dir>]     (Re)generate strategies/INDEX.json catalog
   version                            Print version
   help [command]                     Show help
 
@@ -43,7 +45,9 @@ Examples:
 Команды:
   compile <strategy.json>            Скомпилировать стратегию в командную строку winws.exe
   bat2json <input.bat> [output.json] Конвертировать .bat Flowseal в стратегию ZDefree
-  bootstrap [--out <каталог>]        Скачать winws.exe + WinDivert в папку ZDefree
+  bootstrap [--out <каталог>]        Скачать winws.exe + WinDivert + списки в папку ZDefree
+  lists [--out <каталог>]            Скачать списки доменов/IP из 1andrevich/Re-filter-lists
+  index [--strategies-dir <каталог>] (Пере)генерировать каталог strategies/INDEX.json
   version                            Показать версию
   help [команда]                     Показать справку
 
@@ -94,4 +98,28 @@ Examples:
     public static string WarningsHeader(int n) => Get(
         $"{n} warning(s):",
         $"Предупреждений: {n}");
+
+    public static string IndexUsage => Get(
+        "Usage: zdefree index [--strategies-dir <path>] [--out <path>] [--check]",
+        "Использование: zdefree index [--strategies-dir <путь>] [--out <путь>] [--check]");
+
+    public static string IndexDone(int n, string path) => Get(
+        $"Wrote {path} ({n} strategies)",
+        $"Записан {path} (стратегий: {n})");
+
+    public static string IndexCheckOk(int n) => Get(
+        $"INDEX.json is up to date ({n} strategies).",
+        $"INDEX.json актуален (стратегий: {n}).");
+
+    public static string IndexCheckMismatch(string path) => Get(
+        $"INDEX.json is stale at {path}. Regenerate with: zdefree index",
+        $"INDEX.json устарел: {path}. Перегенерировать: zdefree index");
+
+    public static string ListsUsage => Get(
+        "Usage: zdefree lists [--out <dir>] [--pack <name1,name2,...>] [--validate-only]",
+        "Использование: zdefree lists [--out <каталог>] [--pack <имя1,имя2,...>] [--validate-only]");
+
+    public static string ListsDone(int packCount) => Get(
+        $"Done. Installed {packCount} list pack(s).",
+        $"Готово. Установлено пакетов списков: {packCount}.");
 }

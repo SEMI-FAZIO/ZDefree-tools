@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ZDefree.Core.Models;
 
 namespace ZDefree.Core.Serialization;
@@ -11,6 +12,7 @@ public static class StrategyLoader
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     public static Strategy LoadFromFile(string path)

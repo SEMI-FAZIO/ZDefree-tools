@@ -30,6 +30,8 @@ namespace ZDefree.Cli
                     "compile"   => RunCompile(rest),
                     "bat2json"  => RunBat2Json(rest),
                     "bootstrap" => RunBootstrap(rest).GetAwaiter().GetResult(),
+                    "index"     => RunIndex(rest),
+                    "lists"     => RunLists(rest).GetAwaiter().GetResult(),
                     "version"   => RunVersion(),
                     "help" or "--help" or "-h" or "/?" => RunHelp(rest),
                     _ => UnknownCommand(command),
@@ -137,6 +139,7 @@ namespace ZDefree.Cli
             bool skipWinws = args.Contains("--skip-winws");
             bool skipWinDivert = args.Contains("--skip-windivert");
             bool skipPatterns = args.Contains("--skip-patterns");
+            bool skipLists = args.Contains("--skip-lists");
             string? archStr = ReadOption(args, "--arch");
 
             var arch = archStr?.ToLowerInvariant() switch
@@ -154,6 +157,7 @@ namespace ZDefree.Cli
                 DownloadWinws = !skipWinws,
                 DownloadWinDivert = !skipWinDivert,
                 DownloadPatterns = !skipPatterns,
+                DownloadLists = !skipLists,
                 Arch = arch,
                 Progress = new Progress<BootstrapProgress>(p =>
                 {
@@ -180,6 +184,82 @@ namespace ZDefree.Cli
 
             Console.Error.WriteLine();
             Console.WriteLine(Messages.BootstrapDone(result.InstalledFiles.Count));
+            return 0;
+        }
+
+        private static async Task<int> RunLists(List<string> args)
+        {
+            string outDir = ReadOption(args, "--out") ?? ".";
+            bool validateOnly = args.Contains("--validate-only");
+            string? packArg = ReadOption(args, "--pack");
+            var packs = packArg?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+            var options = new ListsOptions
+            {
+                TargetDir   = outDir,
+                Packs       = packs,
+                ValidateOnly = validateOnly,
+                Progress    = new Progress<BootstrapProgress>(p =>
+                {
+                    string line = Messages.BootstrapStage(p.Component, p.Stage);
+                    if (p.PercentComplete.HasValue) line += $" {p.PercentComplete}%";
+                    Console.Error.WriteLine(line);
+                }),
+            };
+
+            using var gh = new GitHubClient();
+            var installer = new ListsInstaller(gh);
+            var result = await installer.InstallAsync(options);
+
+            if (result.Warnings.Count > 0)
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine(Messages.WarningsHeader(result.Warnings.Count));
+                foreach (var w in result.Warnings)
+                {
+                    Console.Error.WriteLine($"  - {w}");
+                }
+            }
+
+            Console.Error.WriteLine();
+            Console.WriteLine(Messages.ListsDone(result.Packs.Count));
+            return 0;
+        }
+
+        private static int RunIndex(List<string> args)
+        {
+            string strategiesDir = ReadOption(args, "--strategies-dir") ?? "strategies";
+            string outPath       = ReadOption(args, "--out") ?? Path.Combine(strategiesDir, "INDEX.json");
+            bool check           = args.Contains("--check");
+
+            if (!Directory.Exists(strategiesDir))
+            {
+                Console.Error.WriteLine(Messages.ErrFileNotFound(strategiesDir));
+                return 1;
+            }
+
+            string generator = "zdefree index v" + (typeof(CliApp).Assembly.GetName().Version?.ToString(3) ?? "0.0.0");
+            var built = StrategyIndexBuilder.Build(strategiesDir, generator);
+
+            if (check)
+            {
+                if (!File.Exists(outPath))
+                {
+                    Console.Error.WriteLine(Messages.IndexCheckMismatch(outPath));
+                    return 1;
+                }
+                var existing = StrategyIndexBuilder.Deserialize(File.ReadAllText(outPath));
+                if (!StrategyIndexBuilder.Equivalent(built, existing))
+                {
+                    Console.Error.WriteLine(Messages.IndexCheckMismatch(outPath));
+                    return 1;
+                }
+                Console.WriteLine(Messages.IndexCheckOk(built.Strategies.Count));
+                return 0;
+            }
+
+            File.WriteAllText(outPath, StrategyIndexBuilder.Serialize(built));
+            Console.WriteLine(Messages.IndexDone(built.Strategies.Count, outPath));
             return 0;
         }
 

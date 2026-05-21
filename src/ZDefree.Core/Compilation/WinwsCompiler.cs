@@ -235,6 +235,11 @@ public sealed class WinwsCompiler
 
         if (a.UdpFakeSeqLen is int ufsl)          args.Add($"--dpi-desync-udp-fake-seqlen={ufsl}");
 
+        if (!string.IsNullOrEmpty(a.FakeTlsMod))         args.Add($"--dpi-desync-fake-tls-mod={a.FakeTlsMod}");
+        if (a.BadseqIncrement is int bsi)                args.Add($"--dpi-desync-badseq-increment={bsi}");
+        if (!string.IsNullOrEmpty(a.HostFakeSplitMod))   args.Add($"--dpi-desync-hostfakesplit-mod={a.HostFakeSplitMod}");
+        if (!string.IsNullOrEmpty(a.FakedSplitPattern))  args.Add($"--dpi-desync-fakedsplit-pattern={a.FakedSplitPattern}");
+
         if (a.RawArgs is { Count: > 0 })
         {
             args.AddRange(a.RawArgs);

@@ -173,6 +173,11 @@ public static class BatchToStrategy
                 case "--dpi-desync-fake-pos":       advanced.FakePos = value; advancedUsed = true; break;
                 case "--dpi-desync-udp-fake-seqlen":advanced.UdpFakeSeqLen = ParseInt(value); advancedUsed = true; break;
 
+                case "--dpi-desync-fake-tls-mod":   advanced.FakeTlsMod = value;             advancedUsed = true; break;
+                case "--dpi-desync-badseq-increment": advanced.BadseqIncrement = ParseInt(value); advancedUsed = true; break;
+                case "--dpi-desync-hostfakesplit-mod": advanced.HostFakeSplitMod = value;    advancedUsed = true; break;
+                case "--dpi-desync-fakedsplit-pattern": advanced.FakedSplitPattern = value;  advancedUsed = true; break;
+
                 default:
                     advanced.RawArgs ??= new();
                     advanced.RawArgs.Add(token);

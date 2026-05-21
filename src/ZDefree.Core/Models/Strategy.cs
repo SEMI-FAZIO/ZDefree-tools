@@ -269,6 +269,18 @@ public sealed class DesyncAdvanced
     [JsonPropertyName("udp_fake_seqlen")]
     public int? UdpFakeSeqLen { get; set; }
 
+    [JsonPropertyName("fake_tls_mod")]
+    public string? FakeTlsMod { get; set; }
+
+    [JsonPropertyName("badseq_increment")]
+    public int? BadseqIncrement { get; set; }
+
+    [JsonPropertyName("hostfakesplit_mod")]
+    public string? HostFakeSplitMod { get; set; }
+
+    [JsonPropertyName("fakedsplit_pattern")]
+    public string? FakedSplitPattern { get; set; }
+
     [JsonPropertyName("raw_args")]
     public List<string>? RawArgs { get; set; }
 }

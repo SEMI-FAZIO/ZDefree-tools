@@ -1,0 +1,15 @@
+{
+  "id": "alt-one",
+  "name": "Alt One",
+  "category": "alt",
+  "version": 1,
+  "filters": [
+    {
+      "name": "main",
+      "wf": { "tcp": "443" },
+      "rules": [
+        { "match": { "tcp": "443" }, "desync": { "mode": "fake,split2" } }
+      ]
+    }
+  ]
+}

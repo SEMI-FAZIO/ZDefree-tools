@@ -1,0 +1,18 @@
+{
+  "id": "with-i18n",
+  "name": "With I18n",
+  "description": {
+    "en": "English text",
+    "ru": "Русский текст"
+  },
+  "version": 1,
+  "filters": [
+    {
+      "name": "main",
+      "wf": { "tcp": "443" },
+      "rules": [
+        { "match": { "tcp": "443" }, "desync": { "mode": "fake" } }
+      ]
+    }
+  ]
+}
