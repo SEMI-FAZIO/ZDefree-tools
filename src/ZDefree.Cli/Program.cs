@@ -1,4 +1,5 @@
 using ZDefree.Cli;
+using ZDefree.Core.Bootstrap;
 using ZDefree.Core.Compilation;
 using ZDefree.Core.Conversion;
 using ZDefree.Core.Serialization;
@@ -26,9 +27,10 @@ namespace ZDefree.Cli
             {
                 return command switch
                 {
-                    "compile"  => RunCompile(rest),
-                    "bat2json" => RunBat2Json(rest),
-                    "version"  => RunVersion(),
+                    "compile"   => RunCompile(rest),
+                    "bat2json"  => RunBat2Json(rest),
+                    "bootstrap" => RunBootstrap(rest).GetAwaiter().GetResult(),
+                    "version"   => RunVersion(),
                     "help" or "--help" or "-h" or "/?" => RunHelp(rest),
                     _ => UnknownCommand(command),
                 };
@@ -126,6 +128,56 @@ namespace ZDefree.Cli
                 }
             }
 
+            return 0;
+        }
+
+        private static async Task<int> RunBootstrap(List<string> args)
+        {
+            string outDir = ReadOption(args, "--out") ?? ".";
+            bool skipWinws = args.Contains("--skip-winws");
+            bool skipWinDivert = args.Contains("--skip-windivert");
+            string? archStr = ReadOption(args, "--arch");
+
+            var arch = archStr?.ToLowerInvariant() switch
+            {
+                "x64"   => WinwsArch.X64,
+                "x86"   => WinwsArch.X86,
+                "arm64" => WinwsArch.Arm64,
+                null    => WinwsArch.Auto,
+                _       => throw new ArgumentException($"Unknown --arch value: {archStr}. Use x64, x86, or arm64."),
+            };
+
+            var options = new BootstrapOptions
+            {
+                TargetDir = outDir,
+                DownloadWinws = !skipWinws,
+                DownloadWinDivert = !skipWinDivert,
+                Arch = arch,
+                Progress = new Progress<BootstrapProgress>(p =>
+                {
+                    string line = Messages.BootstrapStage(p.Component, p.Stage);
+                    if (p.PercentComplete.HasValue) line += $" {p.PercentComplete}%";
+                    Console.Error.WriteLine(line);
+                }),
+            };
+
+            Console.Error.WriteLine(Messages.BootstrapHeader(Path.GetFullPath(outDir)));
+
+            using var runner = new BootstrapRunner();
+            var result = await runner.RunAsync(options);
+
+            if (result.Warnings.Count > 0)
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine(Messages.WarningsHeader(result.Warnings.Count));
+                foreach (var w in result.Warnings)
+                {
+                    Console.Error.WriteLine($"  - {w}");
+                }
+            }
+
+            Console.Error.WriteLine();
+            Console.WriteLine(Messages.BootstrapDone(result.InstalledFiles.Count));
             return 0;
         }
 

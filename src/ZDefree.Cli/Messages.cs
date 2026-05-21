@@ -27,6 +27,7 @@ Usage: zdefree <command> [options]
 Commands:
   compile <strategy.json>            Compile a strategy to a winws.exe command line
   bat2json <input.bat> [output.json] Convert a Flowseal .bat into a ZDefree strategy
+  bootstrap [--out <dir>]            Download winws.exe + WinDivert into a ZDefree folder
   version                            Print version
   help [command]                     Show help
 
@@ -42,6 +43,7 @@ Examples:
 Команды:
   compile <strategy.json>            Скомпилировать стратегию в командную строку winws.exe
   bat2json <input.bat> [output.json] Конвертировать .bat Flowseal в стратегию ZDefree
+  bootstrap [--out <каталог>]        Скачать winws.exe + WinDivert в папку ZDefree
   version                            Показать версию
   help [команда]                     Показать справку
 
@@ -60,6 +62,22 @@ Examples:
     public static string Bat2JsonUsage => Get(
         "Usage: zdefree bat2json <input.bat> [output.json] [--id <id>] [--name <name>]",
         "Использование: zdefree bat2json <input.bat> [output.json] [--id <идентификатор>] [--name <имя>]");
+
+    public static string BootstrapUsage => Get(
+        "Usage: zdefree bootstrap [--out <dir>] [--skip-winws] [--skip-windivert] [--arch x64|x86|arm64]",
+        "Использование: zdefree bootstrap [--out <каталог>] [--skip-winws] [--skip-windivert] [--arch x64|x86|arm64]");
+
+    public static string BootstrapHeader(string dir) => Get(
+        $"Bootstrapping ZDefree distribution into {dir}",
+        $"Сборка дистрибутива ZDefree в {dir}");
+
+    public static string BootstrapDone(int filesInstalled) => Get(
+        $"Done. Installed {filesInstalled} file(s).",
+        $"Готово. Установлено файлов: {filesInstalled}.");
+
+    public static string BootstrapStage(string component, string stage) => Get(
+        $"[{component}] {stage}",
+        $"[{component}] {stage}");
 
     public static string ErrFileNotFound(string path) => Get(
         $"Error: file not found — {path}",
