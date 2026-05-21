@@ -25,8 +25,8 @@ public sealed record BootstrapProgress(string Component, string Stage, int? Perc
 public sealed class BootstrapResult
 {
     public required string TargetDir { get; init; }
-    public string? WinwsVersion { get; init; }
-    public string? WinDivertVersion { get; init; }
+    public string? WinwsVersion { get; set; }
+    public string? WinDivertVersion { get; set; }
     public List<string> InstalledFiles { get; init; } = new();
     public List<string> Warnings { get; init; } = new();
 }
