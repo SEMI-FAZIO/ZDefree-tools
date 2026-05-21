@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ZDefree.Core</RootNamespace>
+    <AssemblyName>ZDefree.Core</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>ZDefree shared library: strategy models, JSON loader, winws.exe compiler.</Description>
+    <Authors>ZDefree contributors</Authors>
+    <Copyright>MIT</Copyright>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ZDefree.Core.Tests" />
+  </ItemGroup>
+
+</Project>
